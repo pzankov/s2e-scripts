@@ -2,10 +2,14 @@
 
 set -e -u
 
-LOG=~/workspace/image/out/s2e-last/messages.txt
 BIN=~/workspace/image/bin
-PCOUT=~/workspace/image/out/s2e-last/pcs.txt
-FOUT=~/workspace/image/out/s2e-last/funcs.txt
+LOGDIR=~/workspace/image/out/s2e-last
+
+[ $# -eq 1 ] && LOGDIR=$1
+
+LOG=${LOGDIR}/messages.txt
+PCOUT=${LOGDIR}/pcs.txt
+FOUT=${LOGDIR}/funcs.txt
 
 # Args: file
 get_load_addr()
@@ -34,9 +38,12 @@ truncate -s 0 ${FOUT}
 
 echo 'Making list of PCs'
 
-grep 'MemSafety: Unbounded' ${LOG} | awk '{print $7, $9}' | sort | uniq -c | sort -h -r > ${PCOUT}
+LOGSIZE=$(stat -c %s ${LOG})
+cat ${LOG} | pv -p -w 32 -s ${LOGSIZE} | grep 'MemSafety: Unbounded' | awk '{print $7, $9}' | sort | uniq -c | sort -h -r > ${PCOUT}
+
+echo 'Making list of functions'
+
 PCCNT=$(wc -l < ${PCOUT})
-echo ${PCCNT} unique PCs
 
 declare -A LDADDR
 FCNT=0
@@ -69,7 +76,7 @@ while read -r line; do
 
 	echo "${cnt} ${file} ${func} (PC ${addr} offset ${offset})" >> ${FOUT}
 
-	chars=$(( ${FCNT} * 25 / ${PCCNT} ))
+	chars=$(( ( ${FCNT} + 1 ) * 25 / ${PCCNT} ))
 	spaces=$(( 25 - ${chars} ))
 	cstr=$(printf "%${chars}s")
 	sstr=$(printf "%${spaces}s")
