@@ -1,0 +1,114 @@
+#!/bin/bash
+
+LOG=~/workspace/image/out/s2e-last/messages.txt
+OUT=~/workspace/image/out/test.txt
+
+MSG_EXITOK='MemSafety: Runtime check disabled (after sys_exit_group)'
+MSG_ACCESS='MemSafety: Unbounded'
+
+LEVEL=3
+
+COMMANDS=(
+  'false'
+  'true'
+  'echo ${PATH}'
+
+  'touch file'
+  'chgrp root file'
+  'chown root file'
+  'chmod +rwx file'
+  'cp file copy'
+  'mv file moved'
+  'rm file'
+  'ln -s file link'
+  'readlink file'
+  'mkdir dir2'
+  'rmdir dir'
+  'mknod fifo p'
+  'mkfifo fifo'
+  'mktemp'
+  'dd if=/dev/urandom of=file bs=512 count=1'
+
+  'cat /proc/self/maps'
+  'stat /proc/self/maps'
+  'head /proc/self/maps'
+  'tail /proc/self/maps'
+  'nl /proc/self/maps'
+  'sort /proc/self/maps'
+  'od /proc/self/maps'
+
+  'basename /proc/self/maps'
+  'dirname /proc/self/maps'
+
+  'base64 /proc/version'
+  'sum /proc/version'
+  'cksum /proc/version'
+  'md5sum /proc/version'
+  'sha1sum /proc/version'
+  'sha224sum /proc/version'
+  'sha256sum /proc/version'
+  'sha384sum /proc/version'
+  'sha512sum /proc/version'
+
+  'ls'
+  'dir'
+  'vdir'
+
+  'sleep 1'
+  'stty -F /dev/tty'
+  'sync'
+
+  'du /tmp'
+  'df /tmp'
+
+  'factor 15'
+  'seq 1 10'
+
+  'date'
+  'env'
+  'printenv'
+  'uname'
+  'nproc'
+
+  'id'
+  'groups'
+  'users'  
+  'who'
+  'whoami'
+  )
+
+cp script.sh script.sh.back
+
+truncate -s 0 ${OUT}
+
+echo "GCC optimization level: ${LEVEL}" >> ${OUT}
+
+for cmd in "${COMMANDS[@]}"
+do
+   echo "Testing ${cmd}"
+
+   sed -e "s#\${LEVEL}#${LEVEL}#g" -e "s#\${CMD}#${cmd}#g" > script.sh << EOF
+#!/bin/sh
+./s2eget memsafety.so
+S2E=1 LD_PRELOAD=./memsafety.so ./cu-O\${LEVEL}/src/\${CMD}
+./s2ecmd kill 0 "DONE"
+EOF
+
+   ./run-s2e-quiet
+
+   errcnt=-1
+   if grep "${MSG_EXITOK}" ${LOG} > /dev/null; then
+      errcnt=$( grep "${MSG_ACCESS}" ${LOG} | wc -l ); fi
+
+   echo "Result: ${errcnt}"
+   echo
+
+   printf "%6i %s\n" "${errcnt}" "${cmd}" >> ${OUT}
+done
+
+mv script.sh.back script.sh
+
+echo "---"
+sort -r -h ${OUT} -o ${OUT}
+cat ${OUT}
+

@@ -1,0 +1,31 @@
+#!/bin/bash
+
+OUT=~/workspace/image/out
+RUN=/tmp/i386-s2e-softmmu
+
+bash -c 'sleep 5; ssvncviewer -scale 1.5 :0 2>/dev/null' &
+VNCPID=$!
+trap killvnc INT EXIT
+
+killvnc()
+{
+   kill ${VNCPID} 2>/dev/null
+}
+
+rm -rf ${RUN} > /dev/null
+mkdir  ${RUN}
+cp    ~/workspace/s2e/qemu/i386-s2e-softmmu/qemu-system-i386 ${RUN}
+ln -s ~/workspace/s2e/qemu/i386-s2e-softmmu/op_helper.bc     ${RUN}
+ln -s ~/workspace/s2e/build/opt/share/qemu/*                 ${RUN}
+sudo setcap CAP_NET_ADMIN=ep ${RUN}/qemu-system-i386
+
+cd ${OUT}
+
+${RUN}/qemu-system-i386 -L ${RUN} \
+   ~/workspace/image/image.s2e \
+   -vnc :0 -m 96M \
+   -net nic,model=e1000 -net tap \
+   -s2e-config-file ~/workspace/image/config.lua \
+   -loadvm 1 \
+   $@
+

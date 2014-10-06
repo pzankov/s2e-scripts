@@ -1,0 +1,10 @@
+#!/bin/bash
+
+qemu-system-i386 \
+   ~/workspace/image/image.s2e \
+   -enable-kvm \
+   -nographic \
+   -m 4G -smp 4 \
+   -net nic,model=e1000 -net tap \
+   $@
+

@@ -1,0 +1,12 @@
+#!/bin/bash
+
+set -e -u
+
+sudo kpartx -v -a ~/workspace/image/image.s2e
+sudo mount /dev/mapper/loop0p1 /mnt/disk
+sudo cp ~/workspace/linux/arch/x86/boot/bzImage /mnt/disk/boot/vmlinuz-3.2.0-4-686-pae
+sudo umount /mnt/disk
+sudo kpartx -d ~/workspace/image/image.s2e
+
+echo Complete
+
