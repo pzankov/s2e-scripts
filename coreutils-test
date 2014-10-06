@@ -1,5 +1,6 @@
 #!/bin/bash
 
+IMG=~/workspace/image/
 LOG=~/workspace/image/out/s2e-last/messages.txt
 OUT=~/workspace/image/out/test.txt
 
@@ -77,7 +78,7 @@ COMMANDS=(
   'whoami'
   )
 
-cp script.sh script.sh.back
+cp ${IMG}/script.sh /tmp/script.sh.back
 
 truncate -s 0 ${OUT}
 
@@ -87,14 +88,14 @@ for cmd in "${COMMANDS[@]}"
 do
    echo "Testing ${cmd}"
 
-   sed -e "s#\${LEVEL}#${LEVEL}#g" -e "s#\${CMD}#${cmd}#g" > script.sh << EOF
-#!/bin/sh
-./s2eget memsafety.so
-S2E=1 LD_PRELOAD=./memsafety.so ./cu-O\${LEVEL}/src/\${CMD}
-./s2ecmd kill 0 "DONE"
-EOF
+   sed -e "s#\${LEVEL}#${LEVEL}#g" -e "s#\${CMD}#${cmd}#g" > ${IMG}/script.sh <<-EOF
+	#!/bin/sh
+	./s2eget memsafety.so
+	S2E=1 LD_PRELOAD=./memsafety.so ./cu-O\${LEVEL}/src/\${CMD}
+	./s2ecmd kill 0 "DONE"
+	EOF
 
-   ./run-s2e-quiet
+   ${IMG}/run-s2e-quiet
 
    errcnt=-1
    if grep "${MSG_EXITOK}" ${LOG} > /dev/null; then
@@ -106,7 +107,7 @@ EOF
    printf "%6i %s\n" "${errcnt}" "${cmd}" >> ${OUT}
 done
 
-mv script.sh.back script.sh
+mv /tmp/script.sh.back ${IMG}/script.sh
 
 echo "---"
 sort -r -h ${OUT} -o ${OUT}
