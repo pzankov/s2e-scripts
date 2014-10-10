@@ -4,12 +4,9 @@ IMG=~/workspace/image/
 LOG=~/workspace/image/out/s2e-last/messages.txt
 OUT=~/workspace/image/out/test.txt
 
-MSG_EXITOK='MemSafety: Runtime check disabled (after sys_exit_group)'
-MSG_ACCESS='MemSafety: Unbounded'
-
 LEVEL=3
 
-COMMANDS=(
+LIST=(
   'false'
   'true'
   'echo ${PATH}'
@@ -78,36 +75,63 @@ COMMANDS=(
   'whoami'
   )
 
-cp ${IMG}/script.sh /tmp/script.sh.back
+cp ${IMG}/script.sh /tmp/
+cp ${IMG}/config.lua /tmp/
 
 truncate -s 0 ${OUT}
 
-echo "GCC optimization level: ${LEVEL}" >> ${OUT}
-
-for cmd in "${COMMANDS[@]}"
+for elem in "${LIST[@]}"
 do
-   echo "Testing ${cmd}"
+   echo "Testing ${elem}"
 
-   sed -e "s#\${LEVEL}#${LEVEL}#g" -e "s#\${CMD}#${cmd}#g" > ${IMG}/script.sh <<-EOF
+   binary="/root/cu-O${LEVEL}/src/${elem}"
+
+   sed -e "s#BINARY#${binary}#g" > ${IMG}/config.lua <<-EOF
+	s2e = {}
+	plugins = {
+	   "BaseInstructions",
+	   "HostFiles",
+	   "LinuxMonitor",
+	   "ModuleExecutionDetector",
+	   "StackMonitor",
+	   "MemSafety"
+	}
+	pluginsConfig = {}
+	pluginsConfig.HostFiles = {
+	   baseDirs = {"/home/ptt/workspace/image"}
+	}
+	pluginsConfig.ModuleExecutionDetector = {
+	   somename = {
+	      moduleName = "BINARY",
+	      kernelMode = false
+	   }
+	}
+	EOF
+
+   sed -e "s#BINARY#${binary}#g" > ${IMG}/script.sh <<-EOF
 	#!/bin/sh
 	./s2eget memsafety.so
-	S2E=1 LD_PRELOAD=./memsafety.so ./cu-O\${LEVEL}/src/\${CMD}
+	S2E=1 LD_PRELOAD=./memsafety.so BINARY
 	./s2ecmd kill 0 "DONE"
 	EOF
 
    ${IMG}/run-s2e-quiet
 
-   errcnt=-1
-   if grep "${MSG_EXITOK}" ${LOG} > /dev/null; then
-      errcnt=$( grep "${MSG_ACCESS}" ${LOG} | wc -l ); fi
+   errcnt1=-1
+   errcnt2=-1
+   if grep 'LinuxMonitor: Unloaded module' ${LOG} > /dev/null; then
+      errcnt1=$( grep 'MemSafety: Unbounded' ${LOG} | wc -l )
+      errcnt2=$( grep 'MemSafety: Unbounded' ${LOG} | grep -v 'write to .*: 0x8 above stack bound' | wc -l )
+   fi
 
-   echo "Result: ${errcnt}"
+   echo "Result: ${errcnt2} ${errcnt1}"
    echo
 
-   printf "%6i %s\n" "${errcnt}" "${cmd}" >> ${OUT}
+   printf "%6i %6i %s\n" "${errcnt2}" "${errcnt1}" "${elem}" >> ${OUT}
 done
 
-mv /tmp/script.sh.back ${IMG}/script.sh
+mv /tmp/script.sh ${IMG}/
+mv /tmp/config.lua ${IMG}/
 
 echo "---"
 sort -r -h ${OUT} -o ${OUT}
