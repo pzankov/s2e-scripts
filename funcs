@@ -30,7 +30,15 @@ get_load_addr()
 get_func_name()
 {
 	if [ ${2} = 'unknown' ]; then echo 'unknown'; return 0; fi
-	addr2line -f -e ${BIN}/${1} ${2} 2>/dev/null | head -n 1
+
+	out=$(addr2line -f -e ${BIN}/${1} ${2} 2>/dev/null | tr '\n' ' ')
+	[ -z "${out}" ] && return 0
+
+	out=(${out})
+	func=${out[0]}
+	line=${out[1]##*/}
+
+	echo "${func} ${line}"
 }
 
 truncate -s 0 ${PCOUT}
@@ -39,7 +47,7 @@ truncate -s 0 ${FOUT}
 echo 'Making list of PCs'
 
 LOGSIZE=$(stat -c %s ${LOG})
-cat ${LOG} | pv -p -w 32 -s ${LOGSIZE} | grep 'MemSafety: Unbounded' | awk '{print $7, $9}' | sort | uniq -c | sort -h -r > ${PCOUT}
+cat ${LOG} | pv -p -w 32 -s ${LOGSIZE} | grep 'MemSafety: Unbounded' | grep -v 'write to .*: 0x8 above stack bound' | awk '{print $7, $9}' | sort | uniq -c | sort -h -r > ${PCOUT}
 
 echo 'Making list of functions'
 
@@ -68,13 +76,13 @@ while read -r line; do
 
 	if [ ${has_ldaddr} = 'no' ]; then
 		LDADDR[${file}]=$(get_load_addr ${file})
-		[ -z ${LDADDR[${file}]} ] && ( echo Failed to get load addr for ${file}; exit 1 )
+		[ -z "${LDADDR[${file}]}" ] && ( echo Failed to get load addr for ${file}; exit 1 )
 	fi
 
 	offset=$(printf '0x%x' $((${addr} - ${LDADDR[${file}]})))
 
 	func=$(get_func_name ${file} ${offset})
-	[ -z ${func} ] && ( echo Failed to get function name for ${file}:${addr}; continue )
+	[ -z "${func}" ] && ( echo Failed to get function name for ${file}:${addr}; continue )
 
 	echo "${cnt} ${file} ${func} (PC ${addr} offset ${offset})" >> ${FOUT}
 
@@ -82,7 +90,7 @@ while read -r line; do
 	spaces=$(( 25 - ${chars} ))
 	cstr=$(printf "%${chars}s")
 	sstr=$(printf "%${spaces}s")
-	echo -en "\r[${cstr// /.}${sstr}]"
+	echo -en "\r[${cstr// /.}${sstr}] "
 	FCNT=$(( ${FCNT} + 1 ))
 done < ${PCOUT}
 echo
