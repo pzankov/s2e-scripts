@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e -u
+set -o pipefail
 
 BIN=~/workspace/image/bin
 LOGDIR=~/workspace/image/out/s2e-last
@@ -47,7 +48,15 @@ truncate -s 0 ${FOUT}
 echo 'Making list of PCs'
 
 LOGSIZE=$(stat -c %s ${LOG})
-cat ${LOG} | pv -p -w 32 -s ${LOGSIZE} | grep 'MemSafety: Unbounded' | grep -v 'write to .*: 0x8 above stack bound' | awk '{print $7, $9}' | sort | uniq -c | sort -h -r > ${PCOUT}
+cat ${LOG} \
+	| pv -p -w 32 -s ${LOGSIZE} \
+	| grep 'MemSafety: Unbounded' \
+	| grep -v 'write to .*: 0x8 above stack bound' \
+	| awk '{print $7, $9}' \
+	| sort \
+	| uniq -c \
+	| sort -h -r \
+	> ${PCOUT}
 
 echo 'Making list of functions'
 
@@ -76,15 +85,25 @@ while read -r line; do
 
 	if [ ${has_ldaddr} = 'no' ]; then
 		LDADDR[${file}]=$(get_load_addr ${file})
-		[ -z "${LDADDR[${file}]}" ] && ( echo Failed to get load addr for ${file}; exit 1 )
+		if [ -z "${LDADDR[${file}]}" ]; then
+			echo Failed to get load addr for ${file}
+			exit 1
+		fi
 	fi
 
 	offset=$(printf '0x%x' $((${addr} - ${LDADDR[${file}]})))
 
 	func=$(get_func_name ${file} ${offset})
-	[ -z "${func}" ] && ( echo Failed to get function name for ${file}:${addr}; continue )
+	if [ -z "${func}" ]; then
+		echo Failed to get function name for ${file}:${addr}
+		continue
+	fi
+	func=(${func})
+	line=${func[1]}
+	func=${func[0]}
 
-	echo "${cnt} ${file} ${func} (PC ${addr} offset ${offset})" >> ${FOUT}
+	printf '%6i %20s %-20s %20s (PC %s offset %s)\n' \
+		${cnt} ${file} ${func} ${line} ${addr} ${offset} >> ${FOUT}
 
 	chars=$(( ( ${FCNT} + 1 ) * 25 / ${PCCNT} ))
 	spaces=$(( 25 - ${chars} ))
