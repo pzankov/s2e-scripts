@@ -3,7 +3,8 @@
 set -e -u
 set -o pipefail
 
-BIN=~/workspace/image/bin
+MOUNT=/mnt/disk
+IMAGE=~/workspace/image/image.s2e
 LOGDIR=~/workspace/image/out/s2e-last
 
 [ $# -eq 1 ] && LOGDIR=$1
@@ -12,8 +13,9 @@ LOG=${LOGDIR}/messages.txt
 PCOUT=${LOGDIR}/pcs.txt
 FOUT=${LOGDIR}/funcs.txt
 
-# Args: file
-get_load_addr()
+# Args: file.so
+# Out:  /path/to/file.so load_addr
+get_loc()
 {
 	line=$(grep 'r-xp' ${LOG} | grep ${1} | tail -n 1)
 	[ -z "${line}" ] && return 0
@@ -24,13 +26,16 @@ get_load_addr()
 	addr=${addr%-*}
 	addr="0x${addr}"
 
-	echo $addr
+	path=${words[12]}
+
+	echo "${path} ${addr}"
 }
 
-# Args: file offset
+# Args: /path/to/file.so instruction_offset
+# Out:  function_name line_number
 get_func_name()
 {
-	out=$(addr2line -f -e ${BIN}/${1} ${2} 2>/dev/null | tr '\n' ' ')
+	out=$(addr2line -f -e ${MOUNT}/${1} ${2} 2>/dev/null | tr '\n' ' ')
 	[ -z "${out}" ] && return 0
 
 	out=(${out})
@@ -40,8 +45,23 @@ get_func_name()
 	echo "${func} ${line}"
 }
 
+mount_disk()
+{
+	sudo kpartx -v -a ${IMAGE} > /dev/null
+	sudo mount -o,ro /dev/mapper/loop0p1 ${MOUNT}
+}
+
+unmount_disk()
+{
+	sudo umount ${MOUNT}
+	sudo kpartx -d ${IMAGE} > /dev/null
+}
+
 truncate -s 0 ${PCOUT}
 truncate -s 0 ${FOUT}
+
+echo 'Mounting disk'
+mount_disk
 
 echo 'Making list of PCs'
 
@@ -60,7 +80,7 @@ echo 'Making list of functions'
 
 PCCNT=$(wc -l < ${PCOUT})
 
-declare -A LDADDR
+declare -A LOC
 FCNT=0
 
 while read -r line; do
@@ -74,24 +94,24 @@ while read -r line; do
 	file=${file#*:}
 
 	set +u
-	has_ldaddr='yes'
-	[ -v ${LDADDR[${file}]} ] && has_ldaddr='no'
+	loc=(${LOC[${file}]})
 	set -u
 
-	if [ ${has_ldaddr} = 'no' ]; then
+	if [ ${#loc[@]} -ne 2 ]; then
 		ldfile=${file}
 		[ ${file} = 'libdl.so.2' ] && ldfile='libdl-2.13.so'
 		[ ${file} = 'libc.so.6' ] && ldfile='libc-2.13.so'
-		LDADDR[${file}]=$(get_load_addr ${ldfile})
-		if [ -z "${LDADDR[${file}]}" ]; then
-			echo Failed to get load addr for ${file}
+		LOC[${file}]=$(get_loc ${ldfile})
+		loc=(${LOC[${file}]})
+		if [ ${#loc[@]} -ne 2 ]; then
+			echo Failed to get location for ${file}
+			unmount_disk
 			exit 1
 		fi
 	fi
 
-	offset=$(printf '0x%x' $((${addr} - ${LDADDR[${file}]})))
-
-	func=$(get_func_name ${file} ${offset})
+	offset=$(printf '0x%x' $((${addr} - ${loc[1]})))
+	func=$(get_func_name ${loc[0]} ${offset})
 	if [ -z "${func}" ]; then
 		func='???'
 		line='???'
@@ -114,6 +134,9 @@ done < ${PCOUT}
 echo
 
 sort -h -r ${FOUT} -o ${FOUT}
+
+echo 'Unmounting disk'
+unmount_disk
 
 echo "---"
 head -n 25 ${FOUT}
