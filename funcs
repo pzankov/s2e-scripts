@@ -2,6 +2,7 @@
 
 set -e -u
 set -o pipefail
+set -f
 
 MOUNT=/mnt/disk
 IMAGE=~/workspace/image/image.s2e
@@ -13,8 +14,8 @@ LOG=${LOGDIR}/messages.txt
 PCOUT=${LOGDIR}/pcs.txt
 FOUT=${LOGDIR}/funcs.txt
 
-# Args: file.so
-# Out:  /path/to/file.so load_addr
+# Args: elf_file
+# Out:  /path/to/elf_file load_addr
 get_loc()
 {
 	line=$(grep 'r-xp' ${LOG} | grep ${1} | tail -n 1)
@@ -22,16 +23,20 @@ get_loc()
 
 	words=(${line})
 
-	addr=${words[7]}
-	addr=${addr%-*}
-	addr="0x${addr}"
-
 	path=${words[12]}
+
+	if [ -z "${path##*lib*}" ]; then
+		addr=${words[7]}
+		addr=${addr%-*}
+		addr="0x${addr}"
+	else
+		addr='0x0'
+	fi
 
 	echo "${path} ${addr}"
 }
 
-# Args: /path/to/file.so instruction_offset
+# Args: /path/to/elf_file instruction_offset
 # Out:  function_name line_number
 get_func_name()
 {
