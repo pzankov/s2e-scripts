@@ -1,0 +1,13 @@
+#!/bin/bash
+
+set -u -e
+
+COMMAND="${1}"
+ARGS=(${COMMAND})
+BINARY=${ARGS[0]}
+
+sed -i -e "s#BINARY='.*'#BINARY='${COMMAND}'#g" script.sh
+sed -i -e "s#    moduleName = \".*\"#    moduleName = \"${BINARY}\"#g" config.lua
+
+echo OK
+

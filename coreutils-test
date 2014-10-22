@@ -1,5 +1,6 @@
 #!/bin/bash
 
+SS=~/workspace/ss/
 IMG=~/workspace/image/
 LOG=~/workspace/image/out/s2e-last/messages.txt
 OUT=~/workspace/image/out/test.txt
@@ -115,7 +116,7 @@ do
 	./s2ecmd kill 0 "DONE"
 	EOF
 
-   ${IMG}/run-s2e-quiet
+   ${SS}/run-s2e --novnc
 
    errcnt1=-1
    errcnt2=-1
