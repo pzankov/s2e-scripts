@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e -u
+
 SS=~/workspace/ss/
 IMG=~/workspace/image/
 LOG=~/workspace/image/out/s2e-last/messages.txt
@@ -76,18 +78,20 @@ LIST=(
   'whoami'
   )
 
-cp ${IMG}/script.sh /tmp/
+cp ${IMG}/script.sh  /tmp/
 cp ${IMG}/config.lua /tmp/
 
 truncate -s 0 ${OUT}
 
-for elem in "${LIST[@]}"
+for cmd in "${LIST[@]}"
 do
-   echo "Testing ${elem}"
+   echo "Testing ${cmd}"
 
-   binary="/root/cu-O${LEVEL}/src/${elem}"
+   cmdpath="/root/cu-O${LEVEL}/src/"
+   bin=(${cmd})
+   bin=${bin[0]}
 
-   sed -e "s#BINARY#${binary}#g" > ${IMG}/config.lua <<-EOF
+   sed -e "s#BINARY#${cmdpath}${bin}#g" > ${IMG}/config.lua <<-EOF
 	s2e = {}
 	plugins = {
 	   "BaseInstructions",
@@ -109,7 +113,7 @@ do
 	}
 	EOF
 
-   sed -e "s#BINARY#${binary}#g" > ${IMG}/script.sh <<-EOF
+   sed -e "s#BINARY#${cmdpath}${cmd}#g" > ${IMG}/script.sh <<-EOF
 	#!/bin/sh
 	./s2eget memsafety.so
 	S2E=1 LD_PRELOAD=./memsafety.so BINARY
@@ -128,7 +132,7 @@ do
    echo "Result: ${errcnt2} ${errcnt1}"
    echo
 
-   printf "%6i %6i %s\n" "${errcnt2}" "${errcnt1}" "${elem}" >> ${OUT}
+   printf "%6i %6i %s\n" "${errcnt2}" "${errcnt1}" "${cmd}" >> ${OUT}
 done
 
 mv /tmp/script.sh ${IMG}/
