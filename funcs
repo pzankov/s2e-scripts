@@ -65,9 +65,6 @@ unmount_disk()
 truncate -s 0 ${PCOUT}
 truncate -s 0 ${FOUT}
 
-echo 'Mounting disk'
-mount_disk
-
 echo 'Making list of PCs'
 
 LOGSIZE=$(stat -c %s ${LOG})
@@ -84,6 +81,9 @@ cat ${LOG} \
 echo 'Making list of functions'
 
 PCCNT=$(wc -l < ${PCOUT})
+
+echo 'Mounting disk'
+mount_disk
 
 declare -A LOC
 FCNT=0
