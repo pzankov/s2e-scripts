@@ -18,15 +18,15 @@ FOUT=${LOGDIR}/funcs.txt
 # Out:  /path/to/elf_file load_addr
 get_loc()
 {
-	line=$(grep 'r-xp' ${LOG} | grep ${1} | tail -n 1)
+	line=$(grep -o "[0-9a-f]\\+-[0-9a-f]\\+ r-xp [0-9a-f]\\+ [0-9a-f]\\+:[0-9a-f]\\+ [0-9a-f]\\+ .*${1}.*" ${LOG} | tail -n 1)
 	[ -z "${line}" ] && return 0
 
 	words=(${line})
 
-	path=${words[12]}
+	path=${words[5]}
 
 	if [ -z "${path##*lib*}" ]; then
-		addr=${words[7]}
+		addr=${words[0]}
 		addr=${addr%-*}
 		addr="0x${addr}"
 	else
@@ -52,12 +52,14 @@ get_func_name()
 
 mount_disk()
 {
+	echo 'Mounting disk'
 	sudo kpartx -v -a ${IMAGE} > /dev/null
 	sudo mount -o,ro /dev/mapper/loop0p1 ${MOUNT}
 }
 
 unmount_disk()
 {
+	echo 'Unmounting disk'
 	sudo umount ${MOUNT}
 	sudo kpartx -d ${IMAGE} > /dev/null
 }
@@ -82,7 +84,7 @@ echo 'Making list of functions'
 
 PCCNT=$(wc -l < ${PCOUT})
 
-echo 'Mounting disk'
+trap unmount_disk EXIT
 mount_disk
 
 declare -A LOC
@@ -138,10 +140,10 @@ while read -r line; do
 done < ${PCOUT}
 echo
 
-sort -h -r ${FOUT} -o ${FOUT}
-
-echo 'Unmounting disk'
+trap - EXIT
 unmount_disk
+
+sort -h -r ${FOUT} -o ${FOUT}
 
 echo "---"
 head -n 25 ${FOUT}
