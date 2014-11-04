@@ -1,0 +1,12 @@
+#!/bin/bash
+
+OUT=${HOME}/image/out
+
+${HOME}/build/tools-release/Release+Asserts/bin/lcoverage           \
+   -moddir=${HOME}/image                                            \
+   -outputdir=${HOME}/image/out/s2e-last/                           \
+   $( cd ${OUT}/s2e-last/ &&                                        \
+      find -name ExecutionTracer.dat | cut -c 3- | sort -h |        \
+      awk "{printf \" -trace=${OUT}/s2e-last/\" \$0}"               \
+    )
+
