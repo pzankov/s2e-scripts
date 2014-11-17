@@ -1,16 +1,22 @@
 #!/bin/bash
 
-RUN=/tmp/i386-softmmu
+set -e -u
 
-rm -rf ${RUN} > /dev/null
-mkdir  ${RUN}
-cp    ~/workspace/s2e/build/qemu-release/i386-softmmu/qemu-system-i386 ${RUN}
-ln -s ~/workspace/s2e/build/opt/share/qemu/*                           ${RUN}
-sudo setcap CAP_NET_ADMIN=ep ${RUN}/qemu-system-i386
+IMAGE="${HOME}/workspace/image/image.s2e"
+BUILD="${HOME}/workspace/build/"
+RUNDIR="/tmp/x86_64-softmmu/"
 
-${RUN}/qemu-system-i386 \
-   ~/workspace/image/image.s2e \
-   -m 96M \
-   -net nic,model=e1000 -net tap \
-   -monitor telnet:localhost:4444,server,nowait
+rm -rf ${RUNDIR} > /dev/null
+mkdir  ${RUNDIR}
+
+cp    ${BUILD}/qemu-release/x86_64-softmmu/qemu-system-x86_64 ${RUNDIR}
+ln -s ${BUILD}/opt/share/qemu/*                           ${RUNDIR}
+sudo setcap CAP_NET_ADMIN=ep ${RUNDIR}/qemu-system-x86_64
+
+${RUNDIR}/qemu-system-x86_64 \
+   ${IMAGE} \
+   -m 128M \
+   -net nic -net tap \
+   -monitor telnet:localhost:4444,server,nowait \
+   $@
 
