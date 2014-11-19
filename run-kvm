@@ -7,7 +7,7 @@ IMAGE="${HOME}/workspace/image/image.s2e"
 qemu-system-x86_64 \
    ${IMAGE} \
    -enable-kvm \
-   -m 4G -smp 4 \
+   -m 4G -smp 8 \
    -net nic -net tap \
    $@
 

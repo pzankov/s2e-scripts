@@ -15,7 +15,7 @@ sudo setcap CAP_NET_ADMIN=ep ${RUNDIR}/qemu-system-x86_64
 
 ${RUNDIR}/qemu-system-x86_64 \
    ${IMAGE} \
-   -m 128M \
+   -m 256M \
    -net nic -net tap \
    -monitor telnet:localhost:4444,server,nowait \
    $@

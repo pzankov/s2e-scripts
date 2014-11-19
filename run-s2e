@@ -46,7 +46,7 @@ EOF
 ${RUNDIR}/qemu-system-x86_64 \
    -L ${RUNDIR} \
    ${IMAGE} \
-   -m 128M \
+   -m 256M \
    ${VNCOPT} \
    -net nic,model=e1000 -net tap \
    -loadvm 1 \
