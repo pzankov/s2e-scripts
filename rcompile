@@ -4,12 +4,12 @@ set -e -u
 
 rsync -avz --exclude='.*' ~/workspace/s2e/ vader1:~/workspace/s2e
 
-CMD='
+CMD="
 export CPLUS_INCLUDE_PATH=/usr/include:/usr/include/x86_64-linux-gnu:/usr/include/x86_64-linux-gnu/c++/4.8 &&
-make -j16 -C ~/workspace/build/qemu-release &&
-make -j16 -C ~/workspace/build/guest-tools32 &&
-make -j16 -C ~/workspace/build/guest-tools64
-'
+make -j16 -C \~/workspace/build/qemu-release &&
+make -j16 -C \~/workspace/build/guest-tools32 &&
+make -j16 -C \~/workspace/build/guest-tools64
+"
 
 ssh vader1 ${CMD}
 

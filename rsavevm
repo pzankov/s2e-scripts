@@ -1,0 +1,18 @@
+#!/usr/bin/expect -f
+
+set send_slow {1 .01}
+
+spawn telnet dslab-vader1.epfl.ch 4444
+
+expect { 
+   "(qemu) "
+}
+send -s "savevm ready\n\n"
+
+expect { 
+   "(qemu) "
+}
+send -s "q\n\n"
+
+send_user "\n"
+

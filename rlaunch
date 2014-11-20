@@ -1,0 +1,43 @@
+#!/bin/bash
+
+set -e -u
+
+if [ $# -ge 1 ]; then
+	TYPE=$1
+	shift
+else
+	echo 'Invalid arguments'
+	exit 1
+fi
+
+case ${TYPE} in
+	kvm)
+		QEMU="qemu-system-i386"
+		DRIVE="file=\${IMAGE}/image.raw.s2e"
+		OPTS="-enable-kvm -net nic,model=pcnet -net user -redir tcp:4445::445"
+		;;
+	mon)
+		QEMU="\${BUILD}/qemu-release/i386-softmmu/qemu-system-i386"
+		DRIVE="file=\${IMAGE}/image.raw.s2e,cache=writeback,format=s2e"
+		OPTS="-net none -monitor telnet:dslab-vader1.epfl.ch:4444,server,nowait"
+		;;
+	s2e)
+		QEMU="\${BUILD}/qemu-release/i386-s2e-softmmu/qemu-system-i386"
+		DRIVE="file=\${IMAGE}/image.raw.s2e,cache=writeback,format=s2e"
+		OPTS="-net none -s2e-config-file \${IMAGE}/s2e-config.lua -loadvm ready $*"
+		;;
+	*)
+		echo 'Invalid arguments'; exit 1
+		;;
+esac
+
+CMD="
+export IMAGE=\${HOME}/workspace/image &&
+export BUILD=\${HOME}/workspace/build &&
+export S2E_PAYLOAD=\${IMAGE} &&
+export WINDOWS_FS=\${IMAGE}/guestfs &&
+cd \${IMAGE}/out &&
+${QEMU} -drive ${DRIVE} -m 1G -serial file:serial.txt ${OPTS}"
+
+ssh -X vader1 ${CMD}
+
