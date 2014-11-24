@@ -52,7 +52,7 @@ close_qemu()
 
 trap close_qemu INT
 
-bash -c "sleep 3; gvncviewer ${HOST}:${VNC} >/dev/null 2>1" &
+bash -c "sleep 3; gvncviewer ${HOST}:${VNC} >/dev/null 2>&1" &
 
 ssh ${HOST} "
 export IMAGE=\${HOME}/workspace/image &&
