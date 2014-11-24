@@ -11,8 +11,7 @@ set -e -u
 
 HOST='dslab-vader1.epfl.ch'
 QPORT=4444
-VNC_DISPLAY=7
-VNC_DELAY=3
+VNC=7
 GDB=
 
 if [ $# -ge 1 ]; then
@@ -27,7 +26,7 @@ QARGS=
 QARGS+=" -m 1G"
 QARGS+=" -serial file:serial.txt"
 QARGS+=" -monitor telnet:${HOST}:${QPORT},server,nowait"
-QARGS+=" -vnc :${VNC_DISPLAY}"
+QARGS+=" -vnc :${VNC}"
 
 case ${TYPE} in
 	kvm)
@@ -78,7 +77,7 @@ close_qemu()
 
 trap close_qemu INT
 
-bash -c "sleep ${VNC_DELAY}; gvncviewer ${HOST}:${VNC_DISPLAY} >/dev/null 2>&1" &
+bash -c "for i in {0..19}; do echo 'Trying VNC'; gvncviewer ${HOST}:${VNC} 2>/dev/null | grep 'Connected' >/dev/null && break; sleep 0.5; done" &
 
 CMD=
 CMD+="export IMAGE=\${HOME}/workspace/image &&"
