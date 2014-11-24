@@ -1,10 +1,19 @@
 #!/bin/bash
+#
+# Usage:
+#  rlaunch kvm
+#  rlaunch mon
+#  rlaunch s2e [QEMU_ARGS]
+#  rlaunch s2e-gdb [QEMU_ARGS]
+# 
 
 set -e -u
 
 HOST='dslab-vader1.epfl.ch'
-MPORT='4444'
-VNC='7'
+MPORT=4444
+VNC=7
+VNCDELAY=3
+GDB=
 
 if [ $# -ge 1 ]; then
 	TYPE=$1
@@ -25,10 +34,18 @@ case ${TYPE} in
 		DRIVE="file=\${IMAGE}/image.raw.s2e,cache=writeback,format=s2e"
 		OPTS="-net none"
 		;;
-	s2e)
+	s2e|s2e-gdb)
 		QEMU="\${BUILD}/qemu-release/i386-s2e-softmmu/qemu-system-i386"
 		DRIVE="file=\${IMAGE}/image.raw.s2e,cache=writeback,format=s2e"
 		OPTS="-net none -s2e-config-file \${IMAGE}/s2e-config.lua -loadvm ready $*"
+		if [ ${TYPE} == 's2e-gdb' ]; then
+			VNCDELAY=5
+			GDB="
+			truncate -s0 gdb.cfg                     &&
+			echo 'handle SIG38 noprint' >> gdb.cfg   &&
+			echo 'run'                  >> gdb.cfg   &&
+			gdb -x gdb.cfg --args"
+		fi
 		;;
 	*)
 		echo 'Invalid arguments'; exit 1
@@ -52,14 +69,13 @@ close_qemu()
 
 trap close_qemu INT
 
-bash -c "sleep 3; gvncviewer ${HOST}:${VNC} >/dev/null 2>&1" &
+bash -c "sleep ${VNCDELAY}; gvncviewer ${HOST}:${VNC} >/dev/null 2>&1" &
 
 ssh ${HOST} "
-export IMAGE=\${HOME}/workspace/image &&
-export BUILD=\${HOME}/workspace/build &&
-export S2E_PAYLOAD=\${IMAGE} &&
-export WINDOWS_FS=\${IMAGE}/guestfs &&
-cd \${IMAGE}/out &&
-${QEMU} -drive ${DRIVE} -m 1G -serial file:serial.txt -monitor telnet:${HOST}:${MPORT},server,nowait -vnc :${VNC} ${OPTS}
-"
+export IMAGE=\${HOME}/workspace/image    &&
+export BUILD=\${HOME}/workspace/build    &&
+export S2E_PAYLOAD=\${IMAGE}             &&
+export WINDOWS_FS=\${IMAGE}/guestfs      &&
+cd \${IMAGE}/out                         &&
+${GDB} ${QEMU} -drive ${DRIVE} -m 1G -serial file:serial.txt -monitor telnet:${HOST}:${MPORT},server,nowait -vnc :${VNC} ${OPTS}"
 
