@@ -10,9 +10,9 @@
 set -e -u
 
 HOST='dslab-vader1.epfl.ch'
-MPORT=4444
-VNC=7
-VNCDELAY=3
+QPORT=4444
+VNC_DISPLAY=7
+VNC_DELAY=3
 GDB=
 
 if [ $# -ge 1 ]; then
@@ -23,28 +23,37 @@ else
 	exit 1
 fi
 
+QARGS=
+QARGS+=" -m 1G"
+QARGS+=" -serial file:serial.txt"
+QARGS+=" -monitor telnet:${HOST}:${QPORT},server,nowait"
+QARGS+=" -vnc :${VNC_DISPLAY}"
+
 case ${TYPE} in
 	kvm)
 		QEMU="qemu-system-i386"
-		DRIVE="file=\${IMAGE}/image.raw.s2e"
-		OPTS="-enable-kvm -net nic,model=pcnet -net user"
+		QARGS+=" -drive file=\${IMAGE}/image.raw.s2e"
+		QARGS+=" -enable-kvm"
+		QARGS+=" -net nic,model=pcnet -net user"
 		;;
 	mon)
 		QEMU="\${BUILD}/qemu-release/i386-softmmu/qemu-system-i386"
-		DRIVE="file=\${IMAGE}/image.raw.s2e,cache=writeback,format=s2e"
-		OPTS="-net none"
+		QARGS+=" -drive file=\${IMAGE}/image.raw.s2e,cache=writeback,format=s2e"
+		QARGS+=" -net none"
 		;;
 	s2e|s2e-gdb)
 		QEMU="\${BUILD}/qemu-release/i386-s2e-softmmu/qemu-system-i386"
-		DRIVE="file=\${IMAGE}/image.raw.s2e,cache=writeback,format=s2e"
-		OPTS="-net none -s2e-config-file \${IMAGE}/s2e-config.lua -loadvm ready $*"
+		QARGS+=" -drive file=\${IMAGE}/image.raw.s2e,cache=writeback,format=s2e"
+		QARGS+=" -net none"
+		QARGS+=" -s2e-config-file \${IMAGE}/s2e-config.lua"
+		QARGS+=" -loadvm ready"
+		QARGS+=" $*"
 		if [ ${TYPE} == 's2e-gdb' ]; then
-			VNCDELAY=5
-			GDB="
-			truncate -s0 gdb.cfg                     &&
-			echo 'handle SIG38 noprint' >> gdb.cfg   &&
-			echo 'run'                  >> gdb.cfg   &&
-			gdb -x gdb.cfg --args"
+			VNCDELAY=6
+			GDB+="truncate -s0 gdb.cfg                   &&"
+			GDB+="echo 'handle SIG38 noprint' >> gdb.cfg &&"
+			GDB+="echo 'run'                  >> gdb.cfg &&"
+			GDB+="gdb -x gdb.cfg --args"
 		fi
 		;;
 	*)
@@ -58,7 +67,7 @@ close_qemu()
 
 	expect <<-EOF
 		set send_slow {1 .01}
-		spawn telnet ${HOST} ${MPORT}
+		spawn telnet ${HOST} ${QPORT}
 		expect {
 			"(qemu) "
 		}
@@ -69,13 +78,15 @@ close_qemu()
 
 trap close_qemu INT
 
-bash -c "sleep ${VNCDELAY}; gvncviewer ${HOST}:${VNC} >/dev/null 2>&1" &
+bash -c "sleep ${VNC_DELAY}; gvncviewer ${HOST}:${VNC_DISPLAY} >/dev/null 2>&1" &
 
-ssh ${HOST} "
-export IMAGE=\${HOME}/workspace/image    &&
-export BUILD=\${HOME}/workspace/build    &&
-export S2E_PAYLOAD=\${IMAGE}             &&
-export WINDOWS_FS=\${IMAGE}/guestfs      &&
-cd \${IMAGE}/out                         &&
-${GDB} ${QEMU} -drive ${DRIVE} -m 1G -serial file:serial.txt -monitor telnet:${HOST}:${MPORT},server,nowait -vnc :${VNC} ${OPTS}"
+CMD=
+CMD+="export IMAGE=\${HOME}/workspace/image &&"
+CMD+="export BUILD=\${HOME}/workspace/build &&"
+CMD+="export S2E_PAYLOAD=\${IMAGE}          &&"
+CMD+="export WINDOWS_FS=\${IMAGE}/guestfs   &&"
+CMD+="cd \${IMAGE}/out                      &&"
+CMD+="${GDB} ${QEMU} ${QARGS}"
+
+ssh ${HOST} ${CMD}
 
