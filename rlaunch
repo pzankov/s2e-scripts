@@ -84,6 +84,7 @@ CMD+="export IMAGE=\${HOME}/workspace/image &&"
 CMD+="export BUILD=\${HOME}/workspace/build &&"
 CMD+="export S2E_PAYLOAD=\${IMAGE}          &&"
 CMD+="export WINDOWS_FS=\${IMAGE}/guestfs   &&"
+CMD+="mkdir -p \${IMAGE}/out                &&"
 CMD+="cd \${IMAGE}/out                      &&"
 CMD+="${GDB} ${QEMU} ${QARGS}"
 
