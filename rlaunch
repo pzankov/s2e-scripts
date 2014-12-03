@@ -1,10 +1,10 @@
 #!/bin/bash
 #
 # Usage:
-#  rlaunch kvm
-#  rlaunch mon
-#  rlaunch s2e [QEMU_ARGS]
-#  rlaunch s2e-gdb [QEMU_ARGS]
+#  rlaunch kvm                   Run kvm
+#  rlaunch mon                   Run qemu
+#  rlaunch s2e [QEMU_ARGS]       Run s2e-qemu
+#  rlaunch s2e-gdb [QEMU_ARGS]   Run s2e-qemu in GDB
 # 
 
 set -e -u
@@ -75,18 +75,26 @@ close_qemu()
 	EOF
 }
 
+SHCMD=
+SHCMD+="for i in {0..19}; do"
+SHCMD+=" echo 'Connecting to VNC...';"
+SHCMD+=" gvncviewer ${HOST}:${VNC} 2>/dev/null | grep 'Connected' >/dev/null && break;"
+SHCMD+=" sleep 0.5;"
+SHCMD+="done"
+
+SSHCMD=
+SSHCMD+="export IMAGE=\${HOME}/workspace/image &&"
+SSHCMD+="export BUILD=\${HOME}/workspace/build &&"
+SSHCMD+="export S2E_PAYLOAD=\${IMAGE}          &&"
+SSHCMD+="export WINDOWS_FS=\${IMAGE}/guestfs   &&"
+SSHCMD+="mkdir -p \${IMAGE}/out                &&"
+SSHCMD+="cd \${IMAGE}/out                      &&"
+SSHCMD+="${GDB} ${QEMU} ${QARGS}"
+
+bash -c "${SHCMD}" &
+SHPID=$!
+
 trap close_qemu INT
 
-bash -c "for i in {0..19}; do echo 'Trying VNC'; gvncviewer ${HOST}:${VNC} 2>/dev/null | grep 'Connected' >/dev/null && break; sleep 0.5; done" &
-
-CMD=
-CMD+="export IMAGE=\${HOME}/workspace/image &&"
-CMD+="export BUILD=\${HOME}/workspace/build &&"
-CMD+="export S2E_PAYLOAD=\${IMAGE}          &&"
-CMD+="export WINDOWS_FS=\${IMAGE}/guestfs   &&"
-CMD+="mkdir -p \${IMAGE}/out                &&"
-CMD+="cd \${IMAGE}/out                      &&"
-CMD+="${GDB} ${QEMU} ${QARGS}"
-
-ssh ${HOST} ${CMD}
+ssh ${HOST} "${SSHCMD}" || kill ${SHPID}
 
