@@ -2,7 +2,7 @@
 #
 # Usage:
 #  rlaunch kvm                   Run kvm
-#  rlaunch mon                   Run qemu
+#  rlaunch qemu                  Run qemu
 #  rlaunch s2e [QEMU_ARGS]       Run s2e-qemu
 #  rlaunch s2e-gdb [QEMU_ARGS]   Run s2e-qemu in GDB
 # 
@@ -10,24 +10,28 @@
 set -e -u
 
 HOST='dslab-vader1.epfl.ch'
+
+# telnet port for qemu monitor
 QPORT=4444
+
+# VNC display number
 VNC=7
+
+# common qemu args
 GDB=
-
-if [ $# -ge 1 ]; then
-	TYPE=$1
-	shift
-else
-	echo 'Invalid arguments'
-	exit 1
-fi
-
 QARGS=
 QARGS+=" -m 1G"
 QARGS+=" -serial file:serial.txt"
 QARGS+=" -monitor telnet:${HOST}:${QPORT},server,nowait"
 QARGS+=" -vnc :${VNC}"
 
+if [ $# -eq 0 ]; then
+	echo 'You have to specify target type'
+	exit 1
+fi
+
+TYPE=$1
+shift
 case ${TYPE} in
 	kvm)
 		QEMU="qemu-system-i386"
@@ -35,7 +39,7 @@ case ${TYPE} in
 		QARGS+=" -enable-kvm"
 		QARGS+=" -net nic,model=pcnet -net user"
 		;;
-	mon)
+	qemu)
 		QEMU="\${BUILD}/qemu-release/i386-softmmu/qemu-system-i386"
 		QARGS+=" -drive file=\${IMAGE}/image.raw.s2e,cache=writeback,format=s2e"
 		QARGS+=" -net none"
@@ -48,7 +52,6 @@ case ${TYPE} in
 		QARGS+=" -loadvm ready"
 		QARGS+=" $*"
 		if [ ${TYPE} == 's2e-gdb' ]; then
-			VNCDELAY=6
 			GDB+="truncate -s0 gdb.cfg                   &&"
 			GDB+="echo 'handle SIG38 noprint' >> gdb.cfg &&"
 			GDB+="echo 'run'                  >> gdb.cfg &&"
@@ -75,13 +78,15 @@ close_qemu()
 	EOF
 }
 
-SHCMD=
-SHCMD+="for i in {0..19}; do"
-SHCMD+=" echo 'Connecting to VNC...';"
-SHCMD+=" gvncviewer ${HOST}:${VNC} 2>/dev/null | grep 'Connected' >/dev/null && break;"
-SHCMD+=" sleep 0.5;"
-SHCMD+="done"
+# VNC connection loop
+VNCLOOP=
+VNCLOOP+="for i in {0..19}; do"
+VNCLOOP+=" echo 'Connecting to VNC...';"
+VNCLOOP+=" gvncviewer ${HOST}:${VNC} 2>/dev/null | grep 'Connected' >/dev/null && break;"
+VNCLOOP+=" sleep 0.5;"
+VNCLOOP+="done"
 
+# remote command
 SSHCMD=
 SSHCMD+="export IMAGE=\${HOME}/workspace/image &&"
 SSHCMD+="export BUILD=\${HOME}/workspace/build &&"
@@ -91,10 +96,17 @@ SSHCMD+="mkdir -p \${IMAGE}/out                &&"
 SSHCMD+="cd \${IMAGE}/out                      &&"
 SSHCMD+="${GDB} ${QEMU} ${QARGS}"
 
-bash -c "${SHCMD}" &
-SHPID=$!
+#
+#
+#
 
+# start VNC connection loop
+bash -c "${VNCLOOP}" &
+VNCLOOP_PID=$!
+
+# close qemu on Ctrl+C
 trap close_qemu INT
 
-ssh ${HOST} "${SSHCMD}" || kill ${SHPID}
+# launch qemu on remote host
+ssh ${HOST} "${SSHCMD}" || kill ${VNCLOOP_PID}
 
