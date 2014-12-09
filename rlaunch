@@ -2,6 +2,7 @@
 #
 # Usage:
 #  rlaunch kvm                   Run kvm
+#  rlaunch kvm-cp                Run kvm with a copy of disk image
 #  rlaunch qemu                  Run qemu
 #  rlaunch s2e [QEMU_ARGS]       Run s2e-qemu
 #  rlaunch s2e-gdb [QEMU_ARGS]   Run s2e-qemu in GDB
@@ -33,11 +34,15 @@ fi
 TYPE=$1
 shift
 case ${TYPE} in
-	kvm)
+	kvm|kvm-cp)
 		QEMU="qemu-system-i386"
-		QARGS+=" -drive file=\${IMAGE}/image.raw.s2e"
 		QARGS+=" -enable-kvm"
 		QARGS+=" -net nic,model=pcnet -net user"
+		if [ ${TYPE} == 'kvm' ]; then
+			QARGS+=" -drive file=\${IMAGE}/image.raw.s2e"
+		else
+			QARGS+=" -drive file=\${IMAGE}/image.raw.s2e.copy"
+		fi
 		;;
 	qemu)
 		QEMU="\${BUILD}/qemu-release/i386-softmmu/qemu-system-i386"
