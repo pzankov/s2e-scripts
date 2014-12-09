@@ -10,6 +10,10 @@
 
 set -e -u
 
+#
+#
+#
+
 HOST='dslab-vader1.epfl.ch'
 
 # telnet port for qemu monitor
@@ -18,55 +22,61 @@ QPORT=4444
 # VNC display number
 VNC=7
 
-# common qemu args
-GDB=
-QARGS=
-QARGS+=" -m 1G"
-QARGS+=" -serial file:serial.txt"
-QARGS+=" -monitor telnet:${HOST}:${QPORT},server,nowait"
-QARGS+=" -vnc :${VNC}"
+#
+#
+#
 
-if [ $# -eq 0 ]; then
-	echo 'You have to specify target type'
-	exit 1
-fi
+# set up environment
+CMD=
+CMD+="export IMAGE=\${HOME}/workspace/image &&"
+CMD+="export BUILD=\${HOME}/workspace/build &&"
+CMD+="export S2E_PAYLOAD=\${IMAGE}          &&"
+CMD+="export WINDOWS_FS=\${IMAGE}/guestfs   &&"
+CMD+="mkdir -p \${IMAGE}/out                &&"
+CMD+="cd \${IMAGE}/out                      &&"
 
-TYPE=$1
-shift
+if [ $# -eq 0 ]; then echo 'You have to specify target type'; exit 1; fi
+TYPE=$1; shift
 case ${TYPE} in
 	kvm|kvm-cp)
-		QEMU="qemu-system-i386"
-		QARGS+=" -enable-kvm"
-		QARGS+=" -net nic,model=pcnet -net user"
+		CMD+=" qemu-system-i386"
+		CMD+=" -enable-kvm"
+		CMD+=" -net nic,model=pcnet -net user"
 		if [ ${TYPE} == 'kvm' ]; then
-			QARGS+=" -drive file=\${IMAGE}/image.raw.s2e"
+			CMD+=" -drive file=\${IMAGE}/image.raw.s2e"
 		else
-			QARGS+=" -drive file=\${IMAGE}/image.raw.s2e.copy"
+			CMD+=" -drive file=\${IMAGE}/image.raw.s2e.copy"
 		fi
 		;;
 	qemu)
-		QEMU="\${BUILD}/qemu-release/i386-softmmu/qemu-system-i386"
-		QARGS+=" -drive file=\${IMAGE}/image.raw.s2e,cache=writeback,format=s2e"
-		QARGS+=" -net none"
+		CMD+=" \${BUILD}/qemu-release/i386-softmmu/qemu-system-i386"
+		CMD+=" -drive file=\${IMAGE}/image.raw.s2e,cache=writeback,format=s2e"
+		CMD+=" -net none"
 		;;
 	s2e|s2e-gdb)
-		QEMU="\${BUILD}/qemu-release/i386-s2e-softmmu/qemu-system-i386"
-		QARGS+=" -drive file=\${IMAGE}/image.raw.s2e,cache=writeback,format=s2e"
-		QARGS+=" -net none"
-		QARGS+=" -s2e-config-file \${IMAGE}/s2e-config.lua"
-		QARGS+=" -loadvm ready"
-		QARGS+=" $*"
 		if [ ${TYPE} == 's2e-gdb' ]; then
-			GDB+="truncate -s0 gdb.cfg                   &&"
-			GDB+="echo 'handle SIG38 noprint' >> gdb.cfg &&"
-			GDB+="echo 'run'                  >> gdb.cfg &&"
-			GDB+="gdb -x gdb.cfg --args"
+			CMD+="truncate -s0 gdb.cfg                   &&"
+			CMD+="echo 'handle SIG38 noprint' >> gdb.cfg &&"
+			CMD+="echo 'run'                  >> gdb.cfg &&"
+			CMD+="gdb -x gdb.cfg --args"
 		fi
+		CMD+=" \${BUILD}/qemu-release/i386-s2e-softmmu/qemu-system-i386"
+		CMD+=" -drive file=\${IMAGE}/image.raw.s2e,cache=writeback,format=s2e"
+		CMD+=" -net none"
+		CMD+=" -s2e-config-file \${IMAGE}/s2e-config.lua"
+		CMD+=" -loadvm ready"
+		CMD+=" $*"
 		;;
 	*)
 		echo 'Invalid arguments'; exit 1
 		;;
 esac
+
+# add common qemu options
+CMD+=" -m 1G"
+CMD+=" -serial file:serial.txt"
+CMD+=" -monitor telnet:${HOST}:${QPORT},server,nowait"
+CMD+=" -vnc :${VNC}"
 
 close_qemu()
 {
@@ -91,16 +101,6 @@ VNCLOOP+=" gvncviewer ${HOST}:${VNC} 2>/dev/null | grep 'Connected' >/dev/null &
 VNCLOOP+=" sleep 0.5;"
 VNCLOOP+="done"
 
-# remote command
-SSHCMD=
-SSHCMD+="export IMAGE=\${HOME}/workspace/image &&"
-SSHCMD+="export BUILD=\${HOME}/workspace/build &&"
-SSHCMD+="export S2E_PAYLOAD=\${IMAGE}          &&"
-SSHCMD+="export WINDOWS_FS=\${IMAGE}/guestfs   &&"
-SSHCMD+="mkdir -p \${IMAGE}/out                &&"
-SSHCMD+="cd \${IMAGE}/out                      &&"
-SSHCMD+="${GDB} ${QEMU} ${QARGS}"
-
 #
 #
 #
@@ -113,5 +113,5 @@ VNCLOOP_PID=$!
 trap close_qemu INT
 
 # launch qemu on remote host
-ssh ${HOST} "${SSHCMD}" || kill ${VNCLOOP_PID}
+ssh ${HOST} "${CMD}" || kill ${VNCLOOP_PID}
 
