@@ -1,0 +1,14 @@
+#!/usr/bin/expect -f
+
+set cmd [lrange $argv 0 end]
+
+set send_slow {1 .01}
+
+log_user 0
+spawn telnet dslab-vader1.epfl.ch 4444
+
+expect { 
+   "(qemu) "
+}
+send -s "$cmd\n\n"
+
