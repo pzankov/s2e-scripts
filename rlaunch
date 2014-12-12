@@ -98,9 +98,10 @@ close_qemu()
 VNCLOOP=
 VNCLOOP+="for i in {0..19}; do"
 VNCLOOP+=" echo 'Connecting to VNC...';"
-VNCLOOP+=" vncviewer ${HOST}:${VNC} >/dev/null 2>&1;"
+VNCLOOP+=" ssh ${HOST} 'netstat -lnt' | grep $((5900+${VNC})) > /dev/null && break;"
 VNCLOOP+=" sleep 0.5;"
-VNCLOOP+="done"
+VNCLOOP+="done;"
+VNCLOOP+="vncviewer ${HOST}:${VNC} >/dev/null 2>&1;"
 
 #
 #
