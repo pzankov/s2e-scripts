@@ -11,5 +11,6 @@ make -j16 -C \~/workspace/build/guest-tools32 &&
 make -j16 -C \~/workspace/build/guest-tools64
 "
 
-ssh vader1 ${CMD}
+RHOME=$(ssh vader1 pwd)
+ssh vader1 ${CMD} 2>&1 | sed "s#${RHOME}#${HOME}#g"
 
