@@ -12,5 +12,5 @@ make -j16 -C \~/workspace/build/guest-tools64
 "
 
 RHOME=$(ssh vader1 pwd)
-ssh vader1 ${CMD} 2>&1 | sed "s#${RHOME}#${HOME}#g"
+ssh vader1 ${CMD} 2>&1 | sed -l "s#${RHOME}#${HOME}#g"
 
