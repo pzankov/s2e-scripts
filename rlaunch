@@ -68,7 +68,7 @@ case ${TYPE} in
 		CMD+=" $*"
 		;;
 	*)
-		echo 'Invalid arguments'; exit 1
+		echo 'Invalid target type'; exit 1
 		;;
 esac
 
@@ -76,7 +76,7 @@ esac
 CMD+=" -m 1G"
 CMD+=" -serial file:serial.txt"
 CMD+=" -monitor telnet:${HOST}:${QPORT},server,nowait"
-CMD+=" -vnc :${VNC}"
+CMD+=" -vnc :${VNC} -usbdevice tablet"
 
 close_qemu()
 {
@@ -84,6 +84,7 @@ close_qemu()
 
 	expect <<-EOF
 		set send_slow {1 .01}
+		log_user 0
 		spawn telnet ${HOST} ${QPORT}
 		expect {
 			"(qemu) "
@@ -97,7 +98,7 @@ close_qemu()
 VNCLOOP=
 VNCLOOP+="for i in {0..19}; do"
 VNCLOOP+=" echo 'Connecting to VNC...';"
-VNCLOOP+=" gvncviewer ${HOST}:${VNC} 2>/dev/null | grep 'Connected' >/dev/null && break;"
+VNCLOOP+=" vncviewer ${HOST}:${VNC} >/dev/null 2>&1;"
 VNCLOOP+=" sleep 0.5;"
 VNCLOOP+="done"
 
@@ -109,9 +110,12 @@ VNCLOOP+="done"
 bash -c "${VNCLOOP}" &
 VNCLOOP_PID=$!
 
-# close qemu on Ctrl+C
+# quit qemu on Ctrl+C
 trap close_qemu INT
 
 # launch qemu on remote host
-ssh ${HOST} "${CMD}" || kill ${VNCLOOP_PID}
+ssh ${HOST} "${CMD}" || true
+
+# kill VNC connection loop
+kill ${VNCLOOP_PID} 2>/dev/null || true
 
