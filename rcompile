@@ -2,15 +2,35 @@
 
 set -e -u
 
-rsync -avz --exclude='.*' ~/workspace/s2e/ vader1:~/workspace/s2e
+if [ "$#" -ne 4 ]; then
+  echo 'Invalid arguments'
+  exit 1
+fi
+
+LOCAL_S2E=$1
+REMOTE_HOST=$2
+REMOTE_S2E=$3
+REMOTE_BUILD=$4
+
+# Expand paths (for sed)
+LOCAL_S2E=$(echo ${LOCAL_S2E})
+REMOTE_S2E=$(ssh ${REMOTE_HOST} echo ${REMOTE_S2E})
+
+# Sync source
+rsync -avz --exclude='.*' ${LOCAL_S2E} ${REMOTE_HOST}:${REMOTE_S2E}
 
 CMD="
-export CPLUS_INCLUDE_PATH=/usr/include:/usr/include/x86_64-linux-gnu:/usr/include/x86_64-linux-gnu/c++/4.8 &&
-make -j16 -C \~/workspace/build/qemu-release &&
-make -j16 -C \~/workspace/build/guest-tools32 &&
-make -j16 -C \~/workspace/build/guest-tools64
+if [ ! -d ${REMOTE_BUILD} ]; then
+  mkdir -p ${REMOTE_BUILD} &&
+  cd ${REMOTE_BUILD} &&
+  make -f ${REMOTE_S2E}/Makefile;
+else
+  export CPLUS_INCLUDE_PATH=/usr/include:/usr/include/x86_64-linux-gnu:/usr/include/x86_64-linux-gnu/c++/4.8 &&
+  make -j16 -C ${REMOTE_BUILD}/qemu-release &&
+  make -j16 -C ${REMOTE_BUILD}/guest-tools32 &&
+  make -j16 -C ${REMOTE_BUILD}/guest-tools64;
+fi
 "
 
-RHOME=$(ssh vader1 pwd)
-ssh vader1 ${CMD} 2>&1 | sed -l "s#${RHOME}#${HOME}#g"
+ssh ${REMOTE_HOST} ${CMD} 2>&1 | sed -l "s#${REMOTE_S2E}#${LOCAL_S2E}#g"
 
