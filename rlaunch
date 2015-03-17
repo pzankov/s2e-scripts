@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Usage:
-#   rlaunch OPTIONS [QEMU_ARGS]
+#   rlaunch OPTIONS [-- QEMU_ARGS]
 # Options:
 #   -h HOST_NAME    host name
 #   -b BUILD_PATH   build folder on host
@@ -11,10 +11,10 @@
 #                     kvm      kvm
 #                     kvm-cp   kvm with a copy of disk image
 #                     qemu     qemu
-#                     s2e      s2e-qemu (with QEMU_ARGS)
-#                     s2e-gdb  s2e-qemu in GDB (with QEMU_ARGS)
+#                     s2e      s2e-qemu
+#                     s2e-gdb  s2e-qemu in GDB
 # Example:
-#   rlaunch -h dslab-vader1.epfl.ch -b '~/workspace/build' -i '~/workspace/image' -m 1G -t s2e
+#   rlaunch -h dslab-vader1.epfl.ch -b '~/workspace/build' -i '~/workspace/image' -m 1G -t s2e -- --s2e-verbose
 #
 
 set -e -u
@@ -50,6 +50,8 @@ while getopts "h:b:i:m:t:" opt; do
   esac
 done
 shift $((OPTIND-1))
+
+QEMU_ARGS=$*
 
 #
 #
@@ -92,7 +94,6 @@ case ${TYPE} in
 		CMD+=" -net none"
 		CMD+=" -s2e-config-file \${IMAGE}/s2e-config.lua"
 		CMD+=" -loadvm ready"
-		CMD+=" $*"
 		;;
 	*)
 		echo 'Invalid target type'; exit 1
@@ -104,6 +105,7 @@ CMD+=" -m ${QEMU_MEMORY}"
 CMD+=" -serial file:serial.txt"
 CMD+=" -monitor telnet:${REMOTE_HOST}:${QPORT},server,nowait"
 CMD+=" -vnc :${VNC} -usbdevice tablet"
+CMD+=" ${QEMU_ARGS}"
 
 close_qemu()
 {
