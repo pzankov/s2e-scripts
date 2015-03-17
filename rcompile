@@ -1,23 +1,46 @@
 #!/bin/bash
+#
+# Usage:
+#   rcompile OPTIONS
+# Options:
+#   -l S2E_PATH    s2e source folder
+#   -h HOST_NAME   host name
+#   -r S2E_PATH    s2e source folder on host
+#   -b BUILD_PATH  build folder on host
+# Example:
+#   rcompile -l ~/workspace/s2e -h vader1 -r '~/workspace/s2e' -b '~/workspace/build'
+#
 
 set -e -u
 
-if [ "$#" -ne 4 ]; then
-  echo 'Invalid arguments'
-  exit 1
-fi
+#
+#
+#
 
-LOCAL_S2E=$1
-REMOTE_HOST=$2
-REMOTE_S2E=$3
-REMOTE_BUILD=$4
+OPTIND=1
+while getopts "l:h:r:b:" opt; do
+  case "$opt" in
+    l)
+      LOCAL_S2E=${OPTARG}
+      ;;
+    h)
+      REMOTE_HOST=${OPTARG}
+      ;;
+    r)
+      REMOTE_S2E=${OPTARG}
+      ;;
+    b)
+      REMOTE_BUILD=${OPTARG}
+      ;;
+   esac
+done
+shift $((OPTIND-1))
 
-# Expand paths (for sed)
-LOCAL_S2E=$(echo ${LOCAL_S2E})
-REMOTE_S2E=$(ssh ${REMOTE_HOST} echo ${REMOTE_S2E})
+#
+#
+#
 
-# Sync source
-rsync -avz --exclude='.*' ${LOCAL_S2E} ${REMOTE_HOST}:${REMOTE_S2E}
+rsync -avz --exclude='.*' ${LOCAL_S2E}/ ${REMOTE_HOST}:${REMOTE_S2E}
 
 CMD="
 if [ ! -d ${REMOTE_BUILD} ]; then
@@ -31,6 +54,10 @@ else
   make -j16 -C ${REMOTE_BUILD}/guest-tools64;
 fi
 "
+
+# Expand paths for sed
+LOCAL_S2E=$(echo ${LOCAL_S2E})
+REMOTE_S2E=$(ssh ${REMOTE_HOST} echo ${REMOTE_S2E})
 
 ssh ${REMOTE_HOST} ${CMD} 2>&1 | sed -l "s#${REMOTE_S2E}#${LOCAL_S2E}#g"
 
