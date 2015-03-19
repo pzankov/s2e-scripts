@@ -3,18 +3,20 @@
 # Usage:
 #   rlaunch OPTIONS [-- QEMU_ARGS]
 # Options:
+#   -q PORT         change qemu monitor port (default is 4444)
+#   -n VNC_DISPLAY  set up VNC and run client
 #   -h HOST_NAME    host name
-#   -b BUILD_PATH   build folder on host
-#   -i IMAGE_PATH   image folder on host
+#   -b BUILD_PATH   build folder name on host
+#   -i IMAGE_PATH   image folder name on host
 #   -m QEMU_MEMORY  qemu memory
-#   -t TYPE         qemu type
-#                     kvm      kvm
-#                     kvm-cp   kvm with a copy of disk image
-#                     qemu     qemu
-#                     s2e      s2e-qemu
-#                     s2e-gdb  s2e-qemu in GDB
+#   -t TYPE         qemu type:
+#                      kvm       kvm
+#                      kvm-cp    kvm with a copy of disk image
+#                      qemu      qemu
+#                      s2e       s2e-qemu
+#                      s2e-gdb   s2e-qemu in GDB
 # Example:
-#   rlaunch -h dslab-vader1.epfl.ch -b '~/workspace/build' -i '~/workspace/image' -m 1G -t s2e -- --s2e-verbose
+#   rlaunch -n 7 -h dslab-vader1.epfl.ch -b '~/workspace/build' -i '~/workspace/image' -m 1G -t s2e -- --s2e-verbose
 #
 
 set -e -u
@@ -23,31 +25,34 @@ set -e -u
 #
 #
 
-# telnet port for qemu monitor
 QPORT=4444
-
-# VNC display number
-VNC=7
+VNC=-1
 
 OPTIND=1
-while getopts "h:b:i:m:t:" opt; do
-  case "$opt" in
-    h)
-      REMOTE_HOST=${OPTARG}
-      ;;
-    b)
-      REMOTE_BUILD=${OPTARG}
-      ;;
-    i)
-      REMOTE_IMAGE=${OPTARG}
-      ;;
-    m)
-      QEMU_MEMORY=${OPTARG}
-      ;;
-    t)
-      TYPE=${OPTARG}
-      ;;
-  esac
+while getopts "q:n:h:b:i:m:t:" opt; do
+	case "$opt" in
+		q)
+			QPORT=${OPTARG}
+			;;
+		n)
+			VNC=${OPTARG}
+			;;
+		h)
+			REMOTE_HOST=${OPTARG}
+			;;
+		b)
+			REMOTE_BUILD=${OPTARG}
+			;;
+		i)
+			REMOTE_IMAGE=${OPTARG}
+			;;
+		m)
+			QEMU_MEMORY=${OPTARG}
+			;;
+		t)
+			TYPE=${OPTARG}
+			;;
+	esac
 done
 shift $((OPTIND-1))
 
@@ -104,11 +109,18 @@ esac
 CMD+=" -m ${QEMU_MEMORY}"
 CMD+=" -serial file:serial.txt"
 CMD+=" -monitor telnet:${REMOTE_HOST}:${QPORT},server,nowait"
-CMD+=" -vnc :${VNC} -usbdevice tablet"
+CMD+=" -usbdevice tablet"
+if [ ${VNC} -ne -1 ]; then
+	CMD+=" -vnc :${VNC}"
+else
+	CMD+=" -nographic"
+fi
 CMD+=" ${QEMU_ARGS}"
 
 close_qemu()
 {
+	echo 'Closing QEMU'
+
 	trap - INT
 
 	expect <<-EOF
@@ -126,7 +138,7 @@ close_qemu()
 # VNC connection loop
 VNCLOOP=
 VNCLOOP+="for i in {0..19}; do"
-VNCLOOP+=" echo 'Connecting to VNC...';"
+VNCLOOP+=" echo 'Connecting to VNC display ${VNC}...';"
 VNCLOOP+=" ssh ${REMOTE_HOST} 'netstat -lnt' | grep $((5900+${VNC})) > /dev/null && break;"
 VNCLOOP+=" sleep 0.5;"
 VNCLOOP+="done;"
@@ -137,8 +149,10 @@ VNCLOOP+="vncviewer ${REMOTE_HOST}:${VNC} >/dev/null 2>&1;"
 #
 
 # start VNC connection loop
-bash -c "${VNCLOOP}" &
-VNCLOOP_PID=$!
+if [ ${VNC} -ne -1 ]; then
+	bash -c "${VNCLOOP}" &
+	VNCLOOP_PID=$!
+fi
 
 # quit qemu on Ctrl+C
 trap close_qemu INT
@@ -147,5 +161,8 @@ trap close_qemu INT
 ssh ${REMOTE_HOST} "${CMD}" || true
 
 # kill VNC connection loop
-kill ${VNCLOOP_PID} 2>/dev/null || true
+if [ ${VNC} -ne -1 ]; then
+	echo 'Closing VNC'
+	kill ${VNCLOOP_PID} 2>/dev/null || true
+fi
 
