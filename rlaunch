@@ -108,7 +108,7 @@ esac
 # add common qemu options
 CMD+=" -m ${QEMU_MEMORY}"
 CMD+=" -serial file:serial.txt"
-CMD+=" -monitor telnet:${REMOTE_HOST}:${QPORT},server,nowait"
+CMD+=" -monitor telnet:localhost:${QPORT},server,nowait"
 CMD+=" -usbdevice tablet"
 if [ ${VNC} -ne -1 ]; then
 	CMD+=" -vnc :${VNC}"
@@ -123,16 +123,17 @@ close_qemu()
 
 	trap - INT
 
+	ssh ${REMOTE_HOST} "
 	expect <<-EOF
 		set send_slow {1 .01}
 		log_user 0
-		spawn telnet ${REMOTE_HOST} ${QPORT}
+		spawn telnet localhost ${QPORT}
 		expect {
-			"(qemu) "
+			\"(qemu) \"
 		}
-		send -s "q\n\n"
-		send_user "\n"
-	EOF
+		send -s \"q\n\n\"
+		send_user \"\n\"
+	EOF"
 }
 
 # VNC connection loop
