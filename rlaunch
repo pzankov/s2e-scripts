@@ -27,9 +27,12 @@ set -e -u
 
 QPORT=4444
 VNC=-1
+S2E_OPTS=""
+
+BUILDTYPE="debug"
 
 OPTIND=1
-while getopts "q:n:h:b:i:m:t:" opt; do
+while getopts "q:n:h:b:i:m:t:VU" opt; do
 	case "$opt" in
 		q)
 			QPORT=${OPTARG}
@@ -51,6 +54,12 @@ while getopts "q:n:h:b:i:m:t:" opt; do
 			;;
 		t)
 			TYPE=${OPTARG}
+			;;
+		V)
+			S2E_OPTS+=" --s2e-verbose"
+			;;
+		U)
+			S2E_OPTS+=" --s2e-unbuffered-stream"
 			;;
 	esac
 done
@@ -83,7 +92,7 @@ case ${TYPE} in
 		fi
 		;;
 	qemu)
-		CMD+=" \${BUILD}/qemu-release/i386-softmmu/qemu-system-i386"
+		CMD+=" \${BUILD}/qemu-${BUILDTYPE}/i386-softmmu/qemu-system-i386"
 		CMD+=" -drive file=\${IMAGE}/image.raw.s2e,cache=writeback,format=s2e"
 		CMD+=" -net none"
 		;;
@@ -94,7 +103,7 @@ case ${TYPE} in
 			CMD+="echo 'run'                  >> gdb.cfg &&"
 			CMD+="gdb -x gdb.cfg --args"
 		fi
-		CMD+=" \${BUILD}/qemu-release/i386-s2e-softmmu/qemu-system-i386"
+		CMD+=" \${BUILD}/qemu-${BUILDTYPE}/i386-s2e-softmmu/qemu-system-i386"
 		CMD+=" -drive file=\${IMAGE}/image.raw.s2e,cache=writeback,format=s2e"
 		CMD+=" -net none"
 		CMD+=" -s2e-config-file \${IMAGE}/s2e-config.lua"
@@ -115,6 +124,7 @@ if [ ${VNC} -ne -1 ]; then
 else
 	CMD+=" -nographic"
 fi
+CMD+=" ${S2E_OPTS}"
 CMD+=" ${QEMU_ARGS}"
 
 close_qemu()
