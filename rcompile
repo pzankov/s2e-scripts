@@ -42,7 +42,7 @@ shift $((OPTIND-1))
 #
 #
 
-rsync -avz --exclude='.*' ${LOCAL_S2E}/ ${REMOTE_HOST}:${REMOTE_S2E}
+rsync -avz --delete --exclude='.*' ${LOCAL_S2E}/ ${REMOTE_HOST}:${REMOTE_S2E}
 
 CMD="
 export EXTRA_KLEE_FLAGS=--enable-z3 &&
