@@ -28,6 +28,7 @@ set -e -u
 QPORT=4444
 VNC=-1
 S2E_OPTS=""
+SSH_OPTS=""
 
 BUILDTYPE="debug"
 
@@ -39,6 +40,7 @@ while getopts "q:n:h:b:i:m:t:VU" opt; do
 			;;
 		n)
 			VNC=${OPTARG}
+			VNCPORT=$((5900+${VNC}))
 			;;
 		h)
 			REMOTE_HOST=${OPTARG}
@@ -146,21 +148,22 @@ close_qemu()
 	EOF"
 }
 
-# VNC connection loop
-VNCLOOP=
-VNCLOOP+="for i in {0..19}; do"
-VNCLOOP+=" echo 'Connecting to VNC display ${VNC}...';"
-VNCLOOP+=" ssh ${REMOTE_HOST} 'netstat -lnt' | grep $((5900+${VNC})) > /dev/null && break;"
-VNCLOOP+=" sleep 0.5;"
-VNCLOOP+="done;"
-VNCLOOP+="vncviewer ${REMOTE_HOST}:${VNC} >/dev/null 2>&1;"
-
 #
 #
 #
 
 # start VNC connection loop
 if [ ${VNC} -ne -1 ]; then
+	SSH_OPTS+=" -o ExitOnForwardFailure=yes -L ${VNCPORT}:localhost:${VNCPORT}"
+
+	VNCLOOP=
+	VNCLOOP+="for i in {0..19}; do"
+	VNCLOOP+=" echo 'Connecting to VNC display ${VNC}...';"
+	VNCLOOP+=" ssh ${REMOTE_HOST} 'netstat -lnt' | grep ${VNCPORT} > /dev/null && break;"
+	VNCLOOP+=" sleep 0.5;"
+	VNCLOOP+="done;"
+	VNCLOOP+="vncviewer localhost:${VNC} >/dev/null 2>&1;"
+
 	bash -c "${VNCLOOP}" &
 	VNCLOOP_PID=$!
 fi
@@ -169,7 +172,7 @@ fi
 trap close_qemu INT
 
 # launch qemu on remote host
-ssh ${REMOTE_HOST} "${CMD}" || true
+ssh ${SSH_OPTS} ${REMOTE_HOST} "${CMD}" || true
 
 # kill VNC connection loop
 if [ ${VNC} -ne -1 ]; then
