@@ -90,7 +90,7 @@ case ${TYPE} in
 	kvm|kvm-cp)
 		CMD+=" qemu-system-x86_64"
 		CMD+=" -enable-kvm"
-		CMD+=" -net nic,model=pcnet -net user"
+		CMD+=" -net nic,model=e1000 -net user"
 		if [ ${TYPE} == 'kvm' ]; then
 			CMD+=" -drive file=\${IMAGE}/image.raw.s2e"
 		else
@@ -111,7 +111,7 @@ case ${TYPE} in
 		fi
 		CMD+=" \${BUILD}/qemu-${BUILDTYPE}/x86_64-s2e${SP}-softmmu/qemu-system-x86_64"
 		CMD+=" -drive file=\${IMAGE}/image.raw.s2e,cache=writeback,format=s2e"
-		CMD+=" -net none -net nic,model=pcnet"
+		CMD+=" -net none -net nic,model=e1000"
 		CMD+=" -s2e-config-file \${IMAGE}/s2e-config.lua"
 		CMD+=" -loadvm ready"
 		;;
