@@ -9,6 +9,7 @@
 #   -b BUILD_PATH   build folder name on host
 #   -i IMAGE_PATH   image folder name on host
 #   -m QEMU_MEMORY  qemu memory
+#   -x              use x86_64 binary
 #   -t TYPE         qemu type:
 #                      kvm       kvm
 #                      kvm-cp    kvm with a copy of disk image
@@ -32,9 +33,10 @@ SSH_OPTS=""
 
 BUILDTYPE="debug"
 SP=""
+ARCH="i386"
 
 OPTIND=1
-while getopts "q:n:h:b:i:m:t:VUs" opt; do
+while getopts "q:n:h:b:i:m:t:VUsx" opt; do
 	case "$opt" in
 		q)
 			QPORT=${OPTARG}
@@ -67,6 +69,9 @@ while getopts "q:n:h:b:i:m:t:VUs" opt; do
 		s)
 			SP='_sp'
 			;;
+    x)
+      ARCH='x86_64'
+      ;;
 	esac
 done
 shift $((OPTIND-1))
@@ -88,7 +93,7 @@ CMD+="cd \${IMAGE}/out                      &&"
 
 case ${TYPE} in
 	kvm|kvm-cp)
-		CMD+=" qemu-system-x86_64"
+		CMD+=" qemu-system-${ARCH}"
 		CMD+=" -enable-kvm"
 		CMD+=" -net nic,model=e1000 -net user"
 		if [ ${TYPE} == 'kvm' ]; then
@@ -98,7 +103,7 @@ case ${TYPE} in
 		fi
 		;;
 	qemu)
-		CMD+=" \${BUILD}/qemu-${BUILDTYPE}/x86_64-softmmu/qemu-system-x86_64"
+		CMD+=" \${BUILD}/qemu-${BUILDTYPE}/${ARCH}-softmmu/qemu-system-${ARCH}"
 		CMD+=" -drive file=\${IMAGE}/image.raw.s2e,cache=writeback,format=s2e"
 		CMD+=" -net none"
 		;;
@@ -109,7 +114,7 @@ case ${TYPE} in
 			CMD+="echo 'run'                  >> gdb.cfg &&"
 			CMD+="gdb -x gdb.cfg --args"
 		fi
-		CMD+=" \${BUILD}/qemu-${BUILDTYPE}/x86_64-s2e${SP}-softmmu/qemu-system-x86_64"
+		CMD+=" \${BUILD}/qemu-${BUILDTYPE}/${ARCH}-s2e${SP}-softmmu/qemu-system-${ARCH}"
 		CMD+=" -drive file=\${IMAGE}/image.raw.s2e,cache=writeback,format=s2e"
 		CMD+=" -net none -net nic,model=e1000"
 		CMD+=" -s2e-config-file \${IMAGE}/s2e-config.lua"
