@@ -152,6 +152,7 @@ close_qemu()
 		expect {
 			\"(qemu) \"
 		}
+		send -s \"termpg\n\n\"
 		send -s \"q\n\n\"
 		send_user \"\n\"
 	EOF"
