@@ -9,13 +9,17 @@
 #   -b BUILD_PATH   build folder name on host
 #   -i IMAGE_PATH   image folder name on host
 #   -m QEMU_MEMORY  qemu memory
-#   -x              use x86_64 binary
 #   -t TYPE         qemu type:
+#   -r PORT         redirect SSH port to localhost:PORT
 #                      kvm       kvm
 #                      kvm-cp    kvm with a copy of disk image
 #                      qemu      qemu
 #                      s2e       s2e-qemu
 #                      s2e-gdb   s2e-qemu in GDB
+#   -V              verbose option
+#   -U              unbuffered stream option
+#   -s              use single path s2e
+#   -x              use x86_64 binary
 # Example:
 #   rlaunch -n 7 -h dslab-vader1.epfl.ch -b '~/workspace/build' -i '~/workspace/image' -m 1G -t s2e -- --s2e-verbose
 #
@@ -34,9 +38,10 @@ SSH_OPTS=""
 BUILDTYPE="debug"
 SP=""
 ARCH="i386"
+SSH_REDIR=-1
 
 OPTIND=1
-while getopts "q:n:h:b:i:m:t:VUsx" opt; do
+while getopts "q:n:h:b:i:m:t:r:VUsx" opt; do
 	case "$opt" in
 		q)
 			QPORT=${OPTARG}
@@ -60,6 +65,9 @@ while getopts "q:n:h:b:i:m:t:VUsx" opt; do
 		t)
 			TYPE=${OPTARG}
 			;;
+    r)
+      SSH_REDIR=${OPTARG}
+      ;;
 		V)
 			S2E_OPTS+=" --s2e-verbose"
 			;;
@@ -134,6 +142,9 @@ if [ ${VNC} -ne -1 ]; then
 	CMD+=" -vnc :${VNC}"
 else
 	CMD+=" -nographic"
+fi
+if [ ${SSH_REDIR} -ne -1 ]; then
+  CMD+=" -redir tcp:${SSH_REDIR}::22"
 fi
 CMD+=" ${S2E_OPTS}"
 CMD+=" ${QEMU_ARGS}"
