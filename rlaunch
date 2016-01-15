@@ -16,10 +16,11 @@
 #                      qemu      qemu
 #                      s2e       s2e-qemu
 #                      s2e-gdb   s2e-qemu in GDB
-#   -V              verbose option
-#   -U              unbuffered stream option
+#   -v              verbose option
+#   -u              unbuffered stream option
 #   -s              use single path s2e
 #   -x              use x86_64 binary
+#   -A              do not use usb device (used to make CGC image)
 # Example:
 #   rlaunch -n 7 -h dslab-vader1.epfl.ch -b '~/workspace/build' -i '~/workspace/image' -m 1G -t s2e -- --s2e-verbose
 #
@@ -39,9 +40,10 @@ BUILDTYPE="debug"
 SP=""
 ARCH="i386"
 SSH_REDIR=-1
+USB="-usb -device usb-tablet"
 
 OPTIND=1
-while getopts "q:n:h:b:i:m:t:r:VUsx" opt; do
+while getopts "q:n:h:b:i:m:t:r:vusxA" opt; do
 	case "$opt" in
 		q)
 			QPORT=${OPTARG}
@@ -68,10 +70,10 @@ while getopts "q:n:h:b:i:m:t:r:VUsx" opt; do
     r)
       SSH_REDIR=${OPTARG}
       ;;
-		V)
+		v)
 			S2E_OPTS+=" --s2e-verbose"
 			;;
-		U)
+		u)
 			S2E_OPTS+=" --s2e-unbuffered-stream"
 			;;
 		s)
@@ -79,6 +81,9 @@ while getopts "q:n:h:b:i:m:t:r:VUsx" opt; do
 			;;
     x)
       ARCH='x86_64'
+      ;;
+    A)
+      USB=""
       ;;
 	esac
 done
@@ -113,7 +118,7 @@ case ${TYPE} in
 	qemu)
 		CMD+=" \${BUILD}/qemu-${BUILDTYPE}/${ARCH}-softmmu/qemu-system-${ARCH}"
 		CMD+=" -drive file=\${IMAGE}/image.raw.s2e,cache=writeback,format=s2e"
-		CMD+=" -net none"
+		CMD+=" -net none -net nic,model=e1000"
 		;;
 	s2e|s2e-gdb)
 		if [ ${TYPE} == 's2e-gdb' ]; then
@@ -137,7 +142,7 @@ esac
 CMD+=" -m ${QEMU_MEMORY}"
 CMD+=" -serial file:serial.txt"
 CMD+=" -monitor telnet:localhost:${QPORT},server,nowait"
-CMD+=" -usb -device usb-tablet -k en-us"
+CMD+=" ${USB} -k en-us"
 if [ ${VNC} -ne -1 ]; then
 	CMD+=" -vnc :${VNC}"
 else
