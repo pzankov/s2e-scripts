@@ -17,7 +17,8 @@ set -e -u
 #
 #
 
-BUILDTYPE="debug"
+BUILD_TYPE='debug'
+TOOLS_OPTS='ENABLE_OPTIMIZED=0 REQUIRES_RTTI=1'
 
 OPTIND=1
 while getopts "l:h:r:b:" opt; do
@@ -45,15 +46,14 @@ shift $((OPTIND-1))
 rsync -avz --delete --exclude='.*' ${LOCAL_S2E}/ ${REMOTE_HOST}:${REMOTE_S2E}
 
 CMD="
-export EXTRA_KLEE_FLAGS=--enable-z3 &&
-export EXTRA_QEMU_FLAGS=--enable-z3 &&
 if [ ! -d ${REMOTE_BUILD} ]; then
   mkdir -p ${REMOTE_BUILD} &&
   cd ${REMOTE_BUILD} &&
-  make -f ${REMOTE_S2E}/Makefile all-${BUILDTYPE};
+  make -f ${REMOTE_S2E}/Makefile all-${BUILD_TYPE} guest-tools;
 else
   export CPLUS_INCLUDE_PATH=/usr/include:/usr/include/x86_64-linux-gnu:/usr/include/x86_64-linux-gnu/c++/4.8 &&
-  make -j16 -C ${REMOTE_BUILD}/qemu-${BUILDTYPE};
+  make -j16 -C ${REMOTE_BUILD}/qemu-${BUILD_TYPE};
+  make -j16 -C ${REMOTE_BUILD}/tools-${BUILD_TYPE} ${TOOLS_OPTS};
 fi
 "
 
