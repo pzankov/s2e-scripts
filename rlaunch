@@ -11,9 +11,9 @@
 #   -m QEMU_MEMORY  qemu memory
 #   -t TYPE         qemu type:
 #   -r PORT         redirect SSH port to localhost:PORT
-#                      kvm       kvm
-#                      kvm-cp    kvm with a copy of disk image
+#                      kvm       qemu provided by system in KVM mode, will modify base image
 #                      qemu      qemu
+#                      qemu-kvm  qemu in KVM mode
 #                      s2e       s2e-qemu
 #                      s2e-gdb   s2e-qemu in GDB
 #   -v              verbose option
@@ -37,6 +37,8 @@ S2E_OPTS=""
 SSH_OPTS=""
 
 BUILDTYPE="debug"
+BUILDTYPE="release"
+
 SP=""
 ARCH="i386"
 SSH_REDIR=-1
@@ -105,26 +107,27 @@ CMD+="mkdir -p \${IMAGE}/out                &&"
 CMD+="cd \${IMAGE}/out                      &&"
 
 case ${TYPE} in
-	kvm|kvm-cp)
+	kvm)
 		CMD+=" qemu-system-${ARCH}"
 		CMD+=" -enable-kvm"
 		CMD+=" -net nic,model=e1000 -net user"
-		if [ ${TYPE} == 'kvm' ]; then
-			CMD+=" -drive file=\${IMAGE}/image.raw.s2e"
-		else
-			CMD+=" -drive file=\${IMAGE}/image.raw.s2e.copy"
-		fi
+		CMD+=" -drive file=\${IMAGE}/image.raw.s2e"
 		;;
-	qemu)
+	qemu|qemu-kvm)
 		CMD+=" \${BUILD}/qemu-${BUILDTYPE}/${ARCH}-softmmu/qemu-system-${ARCH}"
 		CMD+=" -drive file=\${IMAGE}/image.raw.s2e,cache=writeback,format=s2e"
 		CMD+=" -net none -net nic,model=e1000"
+		if [ ${TYPE} == 'qemu-kvm' ]; then
+			CMD+=" -enable-kvm -enable-serial-commands -serial file:/tmp/serial.txt"
+		fi
 		;;
 	s2e|s2e-gdb)
 		if [ ${TYPE} == 's2e-gdb' ]; then
-			CMD+="truncate -s0 gdb.cfg                   &&"
-			CMD+="echo 'handle SIG38 noprint' >> gdb.cfg &&"
-			CMD+="echo 'run'                  >> gdb.cfg &&"
+			CMD+="truncate -s0 gdb.cfg                          &&"
+			CMD+="echo 'handle SIG38 noprint'        >> gdb.cfg &&"
+			CMD+="echo 'set follow-fork-mode child'  >> gdb.cfg &&"
+			CMD+="echo 'set detach-on-fork off'      >> gdb.cfg &&"
+			CMD+="echo 'run'                         >> gdb.cfg &&"
 			CMD+="gdb -x gdb.cfg --args"
 		fi
 		CMD+=" \${BUILD}/qemu-${BUILDTYPE}/${ARCH}-s2e${SP}-softmmu/qemu-system-${ARCH}"
